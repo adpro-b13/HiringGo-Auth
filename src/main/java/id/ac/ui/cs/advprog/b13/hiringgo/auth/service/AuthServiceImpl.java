@@ -6,89 +6,95 @@ import id.ac.ui.cs.advprog.b13.hiringgo.auth.dto.RegisterRequest;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.model.Role;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.model.User;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.repository.UserRepository;
-// import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.jwt.JwtTokenProvider; // Akan kita buat nanti
+// import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.jwt.JwtTokenProvider;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationManager; // Akan di-inject nanti
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder; // Untuk menyimpan Authentication setelah login
-import org.springframework.security.crypto.password.PasswordEncoder; // Akan di-inject nanti
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // Untuk manajemen transaksi
+import org.springframework.transaction.annotation.Transactional;
 
-@Service // Menandakan bahwa kelas ini adalah komponen Spring Service
-@RequiredArgsConstructor // Lombok: Membuat constructor dengan semua field final yang di-inject
+@Service
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder; // Akan di-inject oleh Spring Security config
-    private final AuthenticationManager authenticationManager; // Akan di-inject oleh Spring Security config
-    // private final JwtTokenProvider jwtTokenProvider; // Akan kita buat dan inject nanti
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    // private final JwtTokenProvider jwtTokenProvider;
 
     @Override
-    @Transactional // Memastikan operasi database berjalan dalam satu transaksi
-    public String registerMahasiswa(RegisterRequest request) {
-        // 1. Validasi Input (sebagian sudah ada di NFR, sebagian bisa di sini)
+    @Transactional
+    public String registerUser(RegisterRequest request) {
+        // 1. Validasi Umum Awal (yang tidak bergantung pada role spesifik untuk NIM/NIP)
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Error: Email sudah terdaftar!");
-        }
-        if (request.getNim() == null || request.getNim().isBlank()) {
-            throw new IllegalArgumentException("Error: NIM tidak boleh kosong untuk mahasiswa!");
-        }
-        if (userRepository.existsByNim(request.getNim())) {
-            throw new IllegalArgumentException("Error: NIM sudah terdaftar!");
         }
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new IllegalArgumentException("Error: Password dan konfirmasi password tidak cocok!");
         }
-        // Validasi kekuatan password (NFR: kombinasi huruf kapital, angka, minimal 8 karakter)
-        // Bisa ditambahkan di sini atau menggunakan validator terpisah.
-        // Contoh sederhana:
         if (request.getPassword().length() < 8) {
             throw new IllegalArgumentException("Error: Password minimal 8 karakter!");
         }
-        // Implementasi validasi regex untuk kekuatan password yang lebih baik bisa ditambahkan.
+        if (request.getRole() == null) { // Tambahan validasi untuk role
+            throw new IllegalArgumentException("Error: Role tidak boleh kosong.");
+        }
 
-
-        // 2. Buat objek User baru
-        User user = User.builder()
+        // Persiapkan builder, tapi JANGAN set password yang di-encode dulu
+        User.UserBuilder userBuilder = User.builder()
                 .namaLengkap(request.getNamaLengkap())
                 .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword())) // Hashing password!
-                .role(Role.MAHASISWA) // Sesuai use case, registrasi awal adalah Mahasiswa
-                .nim(request.getNim())
-                .build();
+                .role(request.getRole());
 
-        // 3. Simpan User ke database
+        // 2. Validasi dan Setup Spesifik Role
+        if (request.getRole() == Role.MAHASISWA) {
+            if (request.getNim() == null || request.getNim().isBlank()) {
+                throw new IllegalArgumentException("Error: NIM tidak boleh kosong untuk mahasiswa!");
+            }
+            if (userRepository.existsByNim(request.getNim())) {
+                throw new IllegalArgumentException("Error: NIM sudah terdaftar!");
+            }
+            userBuilder.nim(request.getNim());
+        } else if (request.getRole() == Role.DOSEN) {
+            if (request.getNip() == null || request.getNip().isBlank()) {
+                throw new IllegalArgumentException("Error: NIP tidak boleh kosong untuk dosen!");
+            }
+            // if (userRepository.existsByNip(request.getNip())) { // Jika ada validasi NIP unik
+            //     throw new IllegalArgumentException("Error: NIP sudah terdaftar!");
+            // }
+            userBuilder.nip(request.getNip());
+        } else if (request.getRole() == Role.ADMIN) {
+            throw new IllegalArgumentException("Error: Registrasi sebagai ADMIN tidak diizinkan melalui endpoint ini.");
+        } else {
+            // Ini seharusnya tidak terjadi jika validasi @NotNull di DTO role bekerja,
+            // tapi baik untuk defensive coding.
+            throw new IllegalArgumentException("Error: Role tidak valid atau tidak didukung.");
+        }
+
+        // Baru encode password SETELAH semua validasi di atas lolos
+        userBuilder.password(passwordEncoder.encode(request.getPassword()));
+
+        // 3. Buat objek User dan Simpan ke database
+        User user = userBuilder.build();
         userRepository.save(user);
 
-        return "Pendaftaran Akun Sukses!"; // Sesuai pesan di use case
+        return "Pendaftaran Akun " + request.getRole().name() + " Sukses!";
     }
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        // 1. Autentikasi menggunakan AuthenticationManager dari Spring Security
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getEmail(),
                         request.getPassword()
                 )
         );
-
-        // 2. Jika autentikasi berhasil, set Authentication ke SecurityContext
         SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        // 3. Dapatkan detail User dari Principal
         User userDetails = (User) authentication.getPrincipal();
-
-        // 4. Generate JWT Token (ini akan memerlukan JwtTokenProvider)
-        // String jwtToken = jwtTokenProvider.generateToken(authentication); // Atau generateTokenFromUser(userDetails)
-        // Untuk sementara, kita set token dummy karena JwtTokenProvider belum dibuat
-        String jwtToken = "dummy-jwt-token-akan-diganti-nanti";
-
-
-        // 5. Buat AuthResponse
+        String jwtToken = "dummy-jwt-token-akan-diganti-nanti"; // Placeholder
         return AuthResponse.builder()
                 .token(jwtToken)
                 .userId(userDetails.getId())
