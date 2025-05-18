@@ -1,10 +1,10 @@
 package id.ac.ui.cs.advprog.b13.hiringgo.auth.dto;
 
-// Import untuk validasi jika diperlukan nanti di controller
-// import jakarta.validation.constraints.Email;
-// import jakarta.validation.constraints.NotBlank;
-// import jakarta.validation.constraints.Size;
-
+import id.ac.ui.cs.advprog.b13.hiringgo.auth.model.Role; // Import Role enum
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull; // Untuk Role
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,18 +15,23 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegisterRequest {
-    // @NotBlank (akan ditambahkan validasi di controller)
+    @NotBlank(message = "Nama lengkap tidak boleh kosong")
     private String namaLengkap;
 
-    // @NotBlank
-    // @Email
+    @NotBlank(message = "Email tidak boleh kosong")
+    @Email(message = "Format email tidak valid")
     private String email;
 
-    // @NotBlank
-    // @Size(min = 8) // Sesuai NFR password minimal 8 karakter
+    @NotBlank(message = "Password tidak boleh kosong")
+    @Size(min = 8, message = "Password minimal 8 karakter")
     private String password;
 
-    private String confirmPassword; // Untuk validasi di service
+    @NotBlank(message = "Konfirmasi password tidak boleh kosong")
+    private String confirmPassword;
+
+    @NotNull(message = "Role tidak boleh kosong") // Menambahkan field role
+    private Role role;
+    
     private String nim;
     private String nip;
 }
