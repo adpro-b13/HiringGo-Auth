@@ -18,7 +18,19 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 
+import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.factory.AuthenticationStrategyFactory;
+import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.strategy.AuthenticationStrategy;
+import jakarta.servlet.Filter;
+
+import org.mockito.ArgumentCaptor;
+
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+
+import static org.mockito.Mockito.mock;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -29,8 +41,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.hamcrest.Matchers.is;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, GlobalExceptionHandler.class, AuthControllerTest.TestSecurityConfiguration.class}) // Tambahkan TestSecurityConfiguration
 class AuthControllerTest {
+
+    // Definisikan konfigurasi tes statis di dalam kelas tes
+    @TestConfiguration
+    static class TestSecurityConfiguration {
+        @Bean
+        @Primary
+        public AuthenticationStrategyFactory jwtStrategyFactoryMock() {
+            AuthenticationStrategyFactory factoryMock = mock(AuthenticationStrategyFactory.class);
+            AuthenticationStrategy strategyMock = mock(AuthenticationStrategy.class);
+
+            // --- Pakai dummy filter yang pasti call filterChain.doFilter (tidak block request) ---
+            jakarta.servlet.Filter dummyFilter = (servletRequest, servletResponse, filterChain) -> {
+                filterChain.doFilter(servletRequest, servletResponse);
+            };
+
+            when(strategyMock.createFilter()).thenReturn(dummyFilter);
+            when(factoryMock.createStrategy()).thenReturn(strategyMock);
+            return factoryMock;
+        }
+    }
+
 
     @Autowired
     private MockMvc mockMvc;
@@ -52,6 +85,7 @@ class AuthControllerTest {
     @BeforeEach
     void setUp() {
         registerRequestMahasiswa = RegisterRequest.builder()
+                // ... (definisi)
                 .namaLengkap("Test Mahasiswa")
                 .email("mahasiswa.test@example.com")
                 .password("password123")
@@ -61,6 +95,7 @@ class AuthControllerTest {
                 .build();
 
         registerRequestDosen = RegisterRequest.builder()
+                // ... (definisi)
                 .namaLengkap("Test Dosen")
                 .email("dosen.test@example.com")
                 .password("passwordDosenKuat")
@@ -85,15 +120,18 @@ class AuthControllerTest {
 
     @Test
     void testRegisterUser_Mahasiswa_Success() throws Exception {
+        String expectedMessage = "Pendaftaran Akun MAHASISWA Sukses!";
+        // Pastikan mock dikonfigurasi untuk RegisterRequest apa pun
         when(authService.registerUser(any(RegisterRequest.class)))
-                .thenReturn("Pendaftaran Akun MAHASISWA Sukses!");
+                .thenReturn(expectedMessage);
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequestMahasiswa))
-                        .with(csrf())) // <--- TAMBAHKAN .with(csrf())
+                        .with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(content().string("Pendaftaran Akun MAHASISWA Sukses!"));
+                .andExpect(content().string(expectedMessage)); // Bandingkan dengan string yang sama
+
         verify(authService).registerUser(any(RegisterRequest.class));
     }
 
