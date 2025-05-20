@@ -36,5 +36,5 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         return new ResponseEntity<>(body, headers, status); // status akan jadi 400 Bad Request
     }
-    
+
 }

@@ -1,7 +1,7 @@
 package id.ac.ui.cs.advprog.b13.hiringgo.auth.config;
 
-// import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.JwtAuthenticationFilter; // Akan dibuat nanti
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier; // Pastikan import ini ada
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -13,61 +13,67 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService; // Import UserDetailsService
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-// import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter; // Akan digunakan saat filter JWT ada
+import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.factory.AuthenticationStrategyFactory;
+import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.strategy.AuthenticationStrategy;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-@Configuration // Menandakan kelas ini sebagai sumber konfigurasi bean
-@EnableWebSecurity // Mengaktifkan dukungan keamanan web Spring
-@EnableMethodSecurity(prePostEnabled = true) // Mengaktifkan keamanan berbasis metode (misal @PreAuthorize)
-@RequiredArgsConstructor
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
+@RequiredArgsConstructor // Ini akan meng-inject field final
 public class SecurityConfig {
 
-    // private final JwtAuthenticationFilter jwtAuthenticationFilter; // Akan di-inject nanti
-    private final UserDetailsService userDetailsService; // Akan di-inject dari UserDetailsServiceImpl yang akan kita buat
+    private final UserDetailsService userDetailsService;
 
-    @Bean // Mendefinisikan bean PasswordEncoder
+    // Inject factory spesifik. Gunakan @Qualifier jika ada beberapa factory dengan tipe yang sama.
+    // Nama qualifier harus sama dengan nama bean yang didefinisikan di JwtStrategyFactory ("jwtStrategyFactory")
+    @Qualifier("jwtStrategyFactory")
+    private final AuthenticationStrategyFactory jwtAuthFactory; // Jadikan final agar di-inject oleh Lombok
+
+    // ... (Bean PasswordEncoder, AuthenticationManager, AuthenticationProvider tetap sama) ...
+    @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // Menggunakan BCrypt sebagai algoritma hashing
+        return new BCryptPasswordEncoder();
     }
 
-    @Bean // Mendefinisikan bean AuthenticationManager
+    @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-    @Bean // Mendefinisikan bean AuthenticationProvider
+    @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService); // Set UserDetailsService kustom kita
-        authProvider.setPasswordEncoder(passwordEncoder()); // Set PasswordEncoder yang kita definisikan
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
 
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        AuthenticationStrategy jwtStrategy = jwtAuthFactory.createStrategy();
+
         http
-                .csrf(AbstractHttpConfigurer::disable) // Nonaktifkan CSRF karena kita akan pakai JWT (stateless)
+                .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers(
-                                "/api/auth/**", // Endpoint registrasi & login publik
-                                // Tambahkan path lain yang ingin publik di sini
-                                "/v3/api-docs/**", // OpenAPI docs jika digunakan
-                                "/swagger-ui/**",   // Swagger UI jika digunakan
+                                "/api/auth/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
-                        // .requestMatchers("/api/admin/**").hasRole("ADMIN") // Contoh proteksi berdasarkan role
-                        // .requestMatchers("/api/dosen/**").hasAnyRole("DOSEN", "ADMIN")
-                        // .requestMatchers("/api/mahasiswa/**").hasAnyRole("MAHASISWA", "ADMIN")
-                        .anyRequest().authenticated() // Semua request lain butuh autentikasi
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Buat sesi stateless untuk JWT
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .authenticationProvider(authenticationProvider()); // Set AuthenticationProvider kustom kita
-        // .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class); // Akan ditambahkan saat filter JWT siap
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtStrategy.createFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
