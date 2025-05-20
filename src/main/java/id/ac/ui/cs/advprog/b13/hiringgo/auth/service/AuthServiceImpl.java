@@ -6,8 +6,7 @@ import id.ac.ui.cs.advprog.b13.hiringgo.auth.dto.RegisterRequest;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.model.Role;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.model.User;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.repository.UserRepository;
-// import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.jwt.JwtTokenProvider;
-
+import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.jwt.JwtTokenProvider; // IMPORT INI
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -18,17 +17,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
+@RequiredArgsConstructor // Ini akan meng-inject field final
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
-    // private final JwtTokenProvider jwtTokenProvider;
+    private final JwtTokenProvider jwtTokenProvider; // JADIKAN FINAL dan akan di-inject
 
     @Override
     @Transactional
     public String registerUser(RegisterRequest request) {
+        // ... (Logika registrasi sudah benar) ...
         // 1. Validasi Umum Awal (yang tidak bergantung pada role spesifik untuk NIM/NIP)
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Error: Email sudah terdaftar!");
@@ -93,10 +93,13 @@ public class AuthServiceImpl implements AuthService {
                 )
         );
         SecurityContextHolder.getContext().setAuthentication(authentication);
+
         User userDetails = (User) authentication.getPrincipal();
-        String jwtToken = "dummy-jwt-token-akan-diganti-nanti"; // Placeholder
+        // String jwtToken = "dummy-jwt-token-akan-diganti-nanti"; // Hapus placeholder
+        String jwtToken = jwtTokenProvider.generateToken(authentication); // GUNAKAN JwtTokenProvider
+
         return AuthResponse.builder()
-                .token(jwtToken)
+                .token(jwtToken) // Token asli
                 .userId(userDetails.getId())
                 .email(userDetails.getEmail())
                 .namaLengkap(userDetails.getNamaLengkap())
