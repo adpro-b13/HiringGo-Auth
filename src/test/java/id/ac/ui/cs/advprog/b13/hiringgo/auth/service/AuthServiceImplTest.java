@@ -6,14 +6,17 @@ import id.ac.ui.cs.advprog.b13.hiringgo.auth.dto.RegisterRequest;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.model.Role;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.model.User;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.repository.UserRepository;
-// import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.jwt.JwtTokenProvider;
+import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.jwt.JwtTokenProvider;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -37,8 +40,8 @@ class AuthServiceImplTest {
     @Mock
     private AuthenticationManager authenticationManager;
 
-    // @Mock
-    // private JwtTokenProvider jwtTokenProvider;
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -46,19 +49,21 @@ class AuthServiceImplTest {
     private RegisterRequest registerRequestMahasiswa;
     private RegisterRequest registerRequestDosen;
     private LoginRequest loginRequestMahasiswa;
+
     private User userMahasiswaEntity;
     private User userDosenEntity;
+
     private Authentication authentication;
 
     @BeforeEach
     void setUp() {
-        // Setup untuk registrasi Mahasiswa
+        // -- RegisterRequest dan Entitas Mahasiswa
         registerRequestMahasiswa = RegisterRequest.builder()
                 .namaLengkap("Test Mahasiswa")
                 .email("mahasiswa.test@example.com")
                 .password("password123")
                 .confirmPassword("password123")
-                .role(Role.MAHASISWA) // Penting: set role
+                .role(Role.MAHASISWA)
                 .nim("1234567890")
                 .build();
 
@@ -71,13 +76,13 @@ class AuthServiceImplTest {
                 .nim("1234567890")
                 .build();
 
-        // Setup untuk registrasi Dosen
+        // -- RegisterRequest dan Entitas Dosen
         registerRequestDosen = RegisterRequest.builder()
                 .namaLengkap("Test Dosen")
                 .email("dosen.test@example.com")
                 .password("passwordDosenKuat")
                 .confirmPassword("passwordDosenKuat")
-                .role(Role.DOSEN) // Penting: set role
+                .role(Role.DOSEN)
                 .nip("0987654321")
                 .build();
 
@@ -90,7 +95,6 @@ class AuthServiceImplTest {
                 .nip("0987654321")
                 .build();
 
-        // Setup untuk login (bisa menggunakan salah satu user)
         loginRequestMahasiswa = LoginRequest.builder()
                 .email("mahasiswa.test@example.com")
                 .password("password123")
@@ -100,7 +104,12 @@ class AuthServiceImplTest {
         SecurityContextHolder.clearContext();
     }
 
-    // --- Tes untuk registerUser ---
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    // --- REGISTER ---
 
     @Test
     void testRegisterUser_Mahasiswa_Success() {
@@ -112,27 +121,25 @@ class AuthServiceImplTest {
         String result = authService.registerUser(registerRequestMahasiswa);
 
         assertEquals("Pendaftaran Akun MAHASISWA Sukses!", result);
-        verify(userRepository, times(1)).existsByEmail(registerRequestMahasiswa.getEmail());
-        verify(userRepository, times(1)).existsByNim(registerRequestMahasiswa.getNim());
-        verify(passwordEncoder, times(1)).encode(registerRequestMahasiswa.getPassword());
-        verify(userRepository, times(1)).save(any(User.class));
+        verify(userRepository).existsByEmail(registerRequestMahasiswa.getEmail());
+        verify(userRepository).existsByNim(registerRequestMahasiswa.getNim());
+        verify(passwordEncoder).encode(registerRequestMahasiswa.getPassword());
+        verify(userRepository).save(any(User.class));
     }
 
     @Test
     void testRegisterUser_Dosen_Success() {
         when(userRepository.existsByEmail(registerRequestDosen.getEmail())).thenReturn(false);
-        // Asumsi tidak ada existsByNip di service, atau jika ada, mock juga
+        // Tambahkan jika ada existsByNip/validasi unik NIP sesuai service
         // when(userRepository.existsByNip(registerRequestDosen.getNip())).thenReturn(false);
         when(passwordEncoder.encode(registerRequestDosen.getPassword())).thenReturn("hashedPasswordDosen");
         when(userRepository.save(any(User.class))).thenReturn(userDosenEntity);
 
         String result = authService.registerUser(registerRequestDosen);
-
         assertEquals("Pendaftaran Akun DOSEN Sukses!", result);
-        verify(userRepository, times(1)).existsByEmail(registerRequestDosen.getEmail());
-        // verify(userRepository, times(1)).existsByNip(registerRequestDosen.getNip()); // Jika ada
-        verify(passwordEncoder, times(1)).encode(registerRequestDosen.getPassword());
-        verify(userRepository, times(1)).save(any(User.class));
+        verify(userRepository).existsByEmail(registerRequestDosen.getEmail());
+        verify(passwordEncoder).encode(registerRequestDosen.getPassword());
+        verify(userRepository).save(any(User.class));
     }
 
     @Test
@@ -143,13 +150,12 @@ class AuthServiceImplTest {
             authService.registerUser(registerRequestMahasiswa);
         });
         assertEquals("Error: Email sudah terdaftar!", exception.getMessage());
-        verify(userRepository, times(1)).existsByEmail(registerRequestMahasiswa.getEmail());
-        verifyNoMoreInteractions(passwordEncoder, userRepository); // Pastikan tidak ada interaksi lain
+        verify(userRepository).existsByEmail(registerRequestMahasiswa.getEmail());
+        verifyNoMoreInteractions(passwordEncoder, userRepository);
     }
 
     @Test
     void testRegisterUser_Mahasiswa_NimAlreadyExists() {
-        registerRequestMahasiswa.setRole(Role.MAHASISWA); // Pastikan role adalah Mahasiswa
         when(userRepository.existsByEmail(registerRequestMahasiswa.getEmail())).thenReturn(false);
         when(userRepository.existsByNim(registerRequestMahasiswa.getNim())).thenReturn(true);
 
@@ -157,37 +163,35 @@ class AuthServiceImplTest {
             authService.registerUser(registerRequestMahasiswa);
         });
         assertEquals("Error: NIM sudah terdaftar!", exception.getMessage());
-        verify(userRepository, times(1)).existsByEmail(registerRequestMahasiswa.getEmail());
-        verify(userRepository, times(1)).existsByNim(registerRequestMahasiswa.getNim());
+        verify(userRepository).existsByEmail(registerRequestMahasiswa.getEmail());
+        verify(userRepository).existsByNim(registerRequestMahasiswa.getNim());
         verifyNoMoreInteractions(passwordEncoder);
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
     void testRegisterUser_Mahasiswa_NimIsNull() {
-        registerRequestMahasiswa.setNim(null); // Set NIM jadi null untuk tes ini
-        registerRequestMahasiswa.setRole(Role.MAHASISWA);
+        registerRequestMahasiswa.setNim(null);
         when(userRepository.existsByEmail(registerRequestMahasiswa.getEmail())).thenReturn(false);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             authService.registerUser(registerRequestMahasiswa);
         });
         assertEquals("Error: NIM tidak boleh kosong untuk mahasiswa!", exception.getMessage());
-        verify(userRepository, times(1)).existsByEmail(registerRequestMahasiswa.getEmail());
+        verify(userRepository).existsByEmail(registerRequestMahasiswa.getEmail());
         verifyNoMoreInteractions(passwordEncoder, userRepository);
     }
 
     @Test
     void testRegisterUser_Dosen_NipIsNull() {
-        registerRequestDosen.setNip(null); // Set NIP jadi null untuk tes ini
-        registerRequestDosen.setRole(Role.DOSEN);
+        registerRequestDosen.setNip(null);
         when(userRepository.existsByEmail(registerRequestDosen.getEmail())).thenReturn(false);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             authService.registerUser(registerRequestDosen);
         });
         assertEquals("Error: NIP tidak boleh kosong untuk dosen!", exception.getMessage());
-        verify(userRepository, times(1)).existsByEmail(registerRequestDosen.getEmail());
+        verify(userRepository).existsByEmail(registerRequestDosen.getEmail());
         verifyNoMoreInteractions(passwordEncoder, userRepository);
     }
 
@@ -195,13 +199,12 @@ class AuthServiceImplTest {
     void testRegisterUser_PasswordMismatch() {
         registerRequestMahasiswa.setConfirmPassword("wrongPassword");
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
-        // Tidak perlu mock existsByNim/Nip karena akan gagal di password
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             authService.registerUser(registerRequestMahasiswa);
         });
         assertEquals("Error: Password dan konfirmasi password tidak cocok!", exception.getMessage());
-        verify(userRepository, times(1)).existsByEmail(registerRequestMahasiswa.getEmail());
+        verify(userRepository).existsByEmail(registerRequestMahasiswa.getEmail());
         verifyNoMoreInteractions(passwordEncoder, userRepository);
     }
 
@@ -215,7 +218,7 @@ class AuthServiceImplTest {
             authService.registerUser(registerRequestMahasiswa);
         });
         assertEquals("Error: Password minimal 8 karakter!", exception.getMessage());
-        verify(userRepository, times(1)).existsByEmail(registerRequestMahasiswa.getEmail());
+        verify(userRepository).existsByEmail(registerRequestMahasiswa.getEmail());
         verifyNoMoreInteractions(passwordEncoder, userRepository);
     }
 
@@ -226,40 +229,41 @@ class AuthServiceImplTest {
                 .email("admin.test@example.com")
                 .password("passwordAdmin")
                 .confirmPassword("passwordAdmin")
-                .role(Role.ADMIN) // Mencoba mendaftar sebagai ADMIN
+                .role(Role.ADMIN)
                 .build();
 
         when(userRepository.existsByEmail(adminRequest.getEmail())).thenReturn(false);
-        // Tidak perlu mock passwordEncoder atau save karena akan gagal sebelumnya
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             authService.registerUser(adminRequest);
         });
         assertEquals("Error: Registrasi sebagai ADMIN tidak diizinkan melalui endpoint ini.", exception.getMessage());
-        verify(userRepository, times(1)).existsByEmail(adminRequest.getEmail());
+        verify(userRepository).existsByEmail(adminRequest.getEmail());
         verifyNoMoreInteractions(passwordEncoder, userRepository);
     }
 
+    // --- LOGIN ---
 
-    // --- Tes untuk login ---
     @Test
     void testLogin_Success_ForMahasiswa() {
         when(authenticationManager.authenticate(
                 any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
         when(authentication.getPrincipal()).thenReturn(userMahasiswaEntity);
-        // when(jwtTokenProvider.generateTokenFromUser(userMahasiswaEntity)).thenReturn("jwt-token-mahasiswa");
+        // Penting! Mock generateToken agar tidak NPE & hasil sesuai ekspektasi:
+        when(jwtTokenProvider.generateToken(any(Authentication.class)))
+                .thenReturn("token-jwt-fake-mahasiswa");
 
         AuthResponse authResponse = authService.login(loginRequestMahasiswa);
 
         assertNotNull(authResponse);
-        assertEquals("dummy-jwt-token-akan-diganti-nanti", authResponse.getToken());
+        assertEquals("token-jwt-fake-mahasiswa", authResponse.getToken());
         assertEquals(userMahasiswaEntity.getId(), authResponse.getUserId());
         assertEquals(userMahasiswaEntity.getEmail(), authResponse.getEmail());
         assertEquals(userMahasiswaEntity.getNamaLengkap(), authResponse.getNamaLengkap());
         assertEquals(userMahasiswaEntity.getRole().name(), authResponse.getRole());
         assertEquals(authentication, SecurityContextHolder.getContext().getAuthentication());
-        verify(authenticationManager, times(1)).authenticate(
+        verify(authenticationManager).authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequestMahasiswa.getEmail(), loginRequestMahasiswa.getPassword())
         );
     }
@@ -274,7 +278,7 @@ class AuthServiceImplTest {
             authService.login(loginRequestMahasiswa);
         });
         assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verify(authenticationManager, times(1)).authenticate(
+        verify(authenticationManager).authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequestMahasiswa.getEmail(), loginRequestMahasiswa.getPassword())
         );
     }
