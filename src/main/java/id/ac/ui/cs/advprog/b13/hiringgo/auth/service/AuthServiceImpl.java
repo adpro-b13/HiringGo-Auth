@@ -59,18 +59,10 @@ public class AuthServiceImpl implements AuthService {
             }
             userBuilder.nim(request.getNim());
         } else if (request.getRole() == Role.DOSEN) {
-            if (request.getNip() == null || request.getNip().isBlank()) {
-                throw new IllegalArgumentException("Error: NIP tidak boleh kosong untuk dosen!");
-            }
-            // if (userRepository.existsByNip(request.getNip())) { // Jika ada validasi NIP unik
-            //     throw new IllegalArgumentException("Error: NIP sudah terdaftar!");
-            // }
-            userBuilder.nip(request.getNip());
+            throw new IllegalArgumentException("Error: Registrasi sebagai DOSEN tidak diizinkan melalui endpoint ini.");
         } else if (request.getRole() == Role.ADMIN) {
             throw new IllegalArgumentException("Error: Registrasi sebagai ADMIN tidak diizinkan melalui endpoint ini.");
         } else {
-            // Ini seharusnya tidak terjadi jika validasi @NotNull di DTO role bekerja,
-            // tapi baik untuk defensive coding.
             throw new IllegalArgumentException("Error: Role tidak valid atau tidak didukung.");
         }
 
