@@ -6,6 +6,9 @@ import id.ac.ui.cs.advprog.b13.hiringgo.auth.dto.RegisterRequest;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.model.Role;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.model.User;
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.repository.UserRepository;
+import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.factory.AuthenticationStrategyFactory;
+import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.strategy.AuthenticationStrategy;
+
 import id.ac.ui.cs.advprog.b13.hiringgo.auth.security.jwt.JwtTokenProvider; // IMPORT INI
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -16,14 +19,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+
 @Service
 @RequiredArgsConstructor // Ini akan meng-inject field final
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider jwtTokenProvider; // JADIKAN FINAL dan akan di-inject
+    private final AuthenticationStrategyFactory jwtAuthFactory;
 
     @Override
     @Transactional
@@ -78,24 +81,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        User userDetails = (User) authentication.getPrincipal();
-        // String jwtToken = "dummy-jwt-token-akan-diganti-nanti"; // Hapus placeholder
-        String jwtToken = jwtTokenProvider.generateToken(authentication); // GUNAKAN JwtTokenProvider
-
-        return AuthResponse.builder()
-                .token(jwtToken) // Token asli
-                .userId(userDetails.getId())
-                .email(userDetails.getEmail())
-                .namaLengkap(userDetails.getNamaLengkap())
-                .role(userDetails.getRole().name())
-                .build();
+        AuthenticationStrategy strategy = jwtAuthFactory.createStrategy();
+        return strategy.login(request); // <-- delegated ke strategy
     }
 }
