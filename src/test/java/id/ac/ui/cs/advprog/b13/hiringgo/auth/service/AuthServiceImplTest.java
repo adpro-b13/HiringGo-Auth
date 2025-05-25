@@ -128,18 +128,21 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void testRegisterUser_Dosen_Success() {
+    void testRegisterUser_Dosen_RegistrationNotAllowed_EvenIfNipIsNull() { // Renamed for clarity
+        registerRequestDosen.setNip(null); // Keep this to show the original intent, though the specific NIP error won't be reached
         when(userRepository.existsByEmail(registerRequestDosen.getEmail())).thenReturn(false);
-        // Tambahkan jika ada existsByNip/validasi unik NIP sesuai service
-        // when(userRepository.existsByNip(registerRequestDosen.getNip())).thenReturn(false);
-        when(passwordEncoder.encode(registerRequestDosen.getPassword())).thenReturn("hashedPasswordDosen");
-        when(userRepository.save(any(User.class))).thenReturn(userDosenEntity);
 
-        String result = authService.registerUser(registerRequestDosen);
-        assertEquals("Pendaftaran Akun DOSEN Sukses!", result);
-        verify(userRepository).existsByEmail(registerRequestDosen.getEmail());
-        verify(passwordEncoder).encode(registerRequestDosen.getPassword());
-        verify(userRepository).save(any(User.class));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            authService.registerUser(registerRequestDosen);
+        });
+
+        assertEquals("Error: Registrasi sebagai DOSEN tidak diizinkan melalui endpoint ini.", exception.getMessage());
+        verify(userRepository).existsByEmail(registerRequestDosen.getEmail()); // This check might still run
+        // Verify that password encoding, saving, and specific NIP checks (if any were previously mocked for this) are NOT called
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
+        // If you had other mocks like existsByNip, verify they are not called:
+        // verify(userRepository, never()).existsByNip(anyString());
     }
 
     @Test
@@ -183,16 +186,20 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void testRegisterUser_Dosen_NipIsNull() {
-        registerRequestDosen.setNip(null);
+    void testRegisterUser_Dosen_RegistrationNotAllowed() { // Renamed for clarity
+        // No need to mock passwordEncoder or userRepository.save as the method should fail earlier
         when(userRepository.existsByEmail(registerRequestDosen.getEmail())).thenReturn(false);
+        // Any other initial checks that happen before role validation can be mocked if necessary
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             authService.registerUser(registerRequestDosen);
         });
-        assertEquals("Error: NIP tidak boleh kosong untuk dosen!", exception.getMessage());
-        verify(userRepository).existsByEmail(registerRequestDosen.getEmail());
-        verifyNoMoreInteractions(passwordEncoder, userRepository);
+
+        assertEquals("Error: Registrasi sebagai DOSEN tidak diizinkan melalui endpoint ini.", exception.getMessage());
+        verify(userRepository).existsByEmail(registerRequestDosen.getEmail()); // This check might still run
+        // Verify that password encoding and saving are NOT called
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
