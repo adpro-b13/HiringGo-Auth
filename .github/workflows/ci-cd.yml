@@ -36,7 +36,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: user-service-jar
+          name: hiringgo-auth-jar
           path: build/libs/*.jar
 
   deploy:
@@ -48,7 +48,7 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: user-service-jar
+          name: hiringgo-auth-jar
           path: .
 
       - name: Set up SSH
@@ -67,13 +67,13 @@ jobs:
           EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
         run: |
           JAR_FILE=$(find . -name "*.jar" | grep -v plain | head -n 1)
-          scp $JAR_FILE $EC2_USERNAME@$EC2_HOST:~/apps/user-service.jar
+          scp $JAR_FILE $EC2_USERNAME@$EC2_HOST:~/apps/hiringgo-auth.jar
 
           ssh $EC2_USERNAME@$EC2_HOST << 'EOF'
-            if pgrep -f "user-service.jar"; then
-              sudo kill $(pgrep -f "user-service.jar")
+            if pgrep -f "hiringgo-auth.jar"; then
+              sudo kill $(pgrep -f "hiringgo-auth.jar")
             fi
             sleep 3
-            nohup java -jar ~/apps/user-service.jar > ~/apps/app.log 2>&1 &
+            nohup java -jar ~/apps/hiringgo-auth.jar > ~/apps/app.log 2>&1 &
             echo "Deployment finished"
           EOF
