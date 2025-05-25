@@ -67,8 +67,10 @@ jobs:
           EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
         run: |
           JAR_FILE=$(find . -name "*.jar" | grep -v plain | head -n 1)
-          scp $JAR_FILE $EC2_USERNAME@$EC2_HOST:~/apps/hiringgo-auth.jar
 
+          ssh $EC2_USERNAME@$EC2_HOST "mkdir -p ~/apps"
+          scp $JAR_FILE $EC2_USERNAME@$EC2_HOST:~/apps/hiringgo-auth.jar
+          
           ssh $EC2_USERNAME@$EC2_HOST << 'EOF'
             if pgrep -f "hiringgo-auth.jar"; then
               sudo kill $(pgrep -f "hiringgo-auth.jar")
